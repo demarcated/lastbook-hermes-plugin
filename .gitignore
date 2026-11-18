@@ -1,0 +1,5 @@
+*.bak
+node_modules/
+evidence/
+DEPLOY-RECEIPT.json
+.DS_Store
