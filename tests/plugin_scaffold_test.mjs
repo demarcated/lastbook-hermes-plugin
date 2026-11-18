@@ -39,7 +39,7 @@ const PLUGIN = path.join(DIR, 'build', 'lastbook-guide', 'plugin.js');
 const SRC = path.join(DIR, 'src', 'plugin.src.js');
 // Test harness deps (jsdom, react, react-dom). Point LB_HARNESS at a dir containing
 // node_modules with those three, or `npm i jsdom react react-dom` into ./tests/harness.
-const HARNESS = process.env.LB_HARNESS || require('path').join(__dirname, 'harness');
+const HARNESS = process.env.LB_HARNESS || path.join(DIR, 'tests', 'harness');
 const VALIDATOR = path.join(DIR, 'tests', 'validator_runner.py');
 
 if (!existsSync(PLUGIN) || !existsSync(SRC)) {
