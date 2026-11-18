@@ -4,7 +4,9 @@ Put your Lastbook survival guide inside the Hermes desktop app: a guide panel, a
 status-bar chip, Ctrl+K commands and Ask deep-links — pointed at **your own** Lastbook
 server. The plugin talks only to the URL you configure.
 
-> **STATUS: DRAFT.** Pending release approval.
+> **STATUS: tier-1 release.** The pinned build is `plugin.js` — its SHA-256 lives in
+> `plugin.sha256` and is repeated in the verification table below. Independent project
+> (MIT); Lastbook itself is MIT-licensed by its own authors.
 
 ---
 
