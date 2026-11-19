@@ -103,7 +103,7 @@ and Hermes still shows nothing, check the folder name is exactly `lastbook-guide
 (the folder name must equal the plugin id) and that the file is `plugin.js` — not
 `plugin.js.txt`. Then Ctrl+K → "Reload desktop plugins".
 
-**Either OS:** confirm the hash — `380b8818…` as spelled out in the README. A partial
+**Either OS:** compare the full hash with the one in the README. A partial
 copy (email round-trips, browser "Save link as" hiccups) is the classic silent failure.
 
 ## Where does it keep my URL and key?

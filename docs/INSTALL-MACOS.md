@@ -41,7 +41,7 @@ next steps.
    ```
 
 3. Read what it prints. The file it installs must hash to
-   `e56534089ac4ae825bf3acecd94a956b2e0d2abb20e520e3ce28cd39192e645b`. If it warns that
+   `fe047a96414bb614dfb599b9c83985944a58f31fa68c0f2d7104ff99074e154d`. If it warns that
    a file does **not** match that hash, stop and ask whoever gave you the file — don't
    push through the warning.
 4. Skip to [Finish inside Hermes](#finish-inside-hermes).
@@ -63,7 +63,7 @@ and type `~/.hermes/desktop-plugins` — it opens the hidden folder, and you can
 shasum -a 256 ~/.hermes/desktop-plugins/lastbook-guide/plugin.js
 ```
 
-That long string should end in `380b8818…` — compare it to the full hash above.
+Compare the full hash with the one above.
 
 Then go to [Finish inside Hermes](#finish-inside-hermes).
 

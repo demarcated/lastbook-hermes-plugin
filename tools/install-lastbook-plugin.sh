@@ -27,8 +27,8 @@ set -euo pipefail
 PLUGIN_ID="lastbook-guide"
 PLUGIN_NAME="Lastbook · Survival Guide"
 OFFICIAL_SITE="https://lastbook.org"
-# Pinned release build (tier 1 plugin.js, 23,267 bytes, 2026-11-18). The README repeats this hash.
-PINNED_SHA256="e56534089ac4ae825bf3acecd94a956b2e0d2abb20e520e3ce28cd39192e645b"
+# Pinned release build (tier 1 plugin.js, 24,434 bytes, 2026-11-18). The README repeats this hash.
+PINNED_SHA256="fe047a96414bb614dfb599b9c83985944a58f31fa68c0f2d7104ff99074e154d"
 
 step() { printf '\n\033[36m== %s\033[0m\n' "$1"; }
 note() { printf '   %s\n' "$1"; }

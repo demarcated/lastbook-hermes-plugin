@@ -43,7 +43,7 @@ and prints the next steps.
 
 4. Read what it prints. It tells you where it put the file and what it verified:
    the file it installs must hash to
-   `e56534089ac4ae825bf3acecd94a956b2e0d2abb20e520e3ce28cd39192e645b`.
+   `fe047a96414bb614dfb599b9c83985944a58f31fa68c0f2d7104ff99074e154d`.
    If it warns that a file does **not** match that hash, stop and ask whoever gave
    you the file — don't push through the warning.
 5. Skip to [Finish inside Hermes](#finish-inside-hermes).

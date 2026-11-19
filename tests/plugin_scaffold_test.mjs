@@ -119,6 +119,7 @@ let mode = { kind: 'json', status: 200, body: { online: true } };
 globalThis.fetch = async (u, init) => {
   fetchCalls.push({ u: String(u), cache: init && init.cache, credentials: init && init.credentials, hasSignal: !!(init && init.signal) });
   if (mode.kind === 'throw') throw new TypeError('Failed to fetch');
+  if (mode.kind === 'pending') return mode.response;
   const body = JSON.stringify(mode.body);
   return { status: mode.status, clone: () => ({ json: async () => JSON.parse(body) }) };
 };
@@ -239,7 +240,7 @@ const wv1 = paneHost.querySelector('webview');
 ok(!!wv1 && wv1.getAttribute('partition') === 'persist:hermes-lastbook', 'embed mounts with dedicated partition');
 ok(wv1.getAttribute('src') === 'http://127.0.0.1:8890#/ask', 'embed src is canonical base#/ask (default Ask view)');
 ok(!wv1.getAttribute('src').includes('?key='), 'loopback is key-exempt — no ?key= on loopback embed');
-ok(ctx.storageMap.get('lastbookKey') === 'ignored-on-loopback', 'key still stored (for when the URL changes)');
+ok(ctx.storageMap.get('lastbookKey') === 'ignored-on-loopback', 'key is stored for the configured origin');
 const p1 = fetchCalls.find(c => c.u === 'http://127.0.0.1:8890/api/assistant/status');
 ok(!!p1, 'single probe fired at /api/assistant/status on save');
 ok(p1 && p1.cache === 'no-store' && p1.credentials === 'omit' && p1.hasSignal, 'probe uses cache:no-store + credentials:omit + AbortSignal (reading contract)');
@@ -321,14 +322,66 @@ dom.window.hermesDesktop = { openExternal: async u => { offOriginOpened = !!u; }
 act(() => wv2.dispatchEvent(badEv));
 ok(!offOriginOpened, 'off-origin embed popup dropped silently (isConfiguredOrigin choke point)');
 
-// paste-with-key split
+// Switch servers while a copy fallback is visible and earlier requests are still pending.
+await setInput(paneHost.querySelector('.lb-askbar input'), 'previous private draft');
+delete dom.window.hermesDesktop;
+await click(buttonByText(paneHost, '↗ browser'));
+ok(!!paneHost.querySelector('.lb-copy input'), 'old server has a visible copy link before switch');
+let rejectOpen;
+dom.window.hermesDesktop = { openExternal: () => new Promise((resolve, reject) => { rejectOpen = reject; }) };
+await click(buttonByText(paneHost, '↗ browser'));
+let finishProbe;
+mode = { kind: 'pending', response: new Promise(resolve => { finishProbe = resolve; }) };
+ctx.intervals.find(t => t.ms === 60000).fn();
+const beforeSwitch = fetchCalls.length;
 await click(buttonByText(paneHost, 'url'));
 await setInput(setupInputs()[0], 'http://h.example:8891/?key=pasted99');
-await setInput(setupInputs()[1], '');
 mode = { kind: 'json', status: 200, body: { online: true } };
 await click(buttonByText(paneHost, 'Save'));
 ok(ctx.storageMap.get('lastbookUrl') === 'http://h.example:8891' && ctx.storageMap.get('lastbookKey') === 'pasted99', 'pasted access link auto-splits into origin + key');
-ok(paneHost.querySelector('webview').getAttribute('src').startsWith('http://h.example:8891?key=pasted99#/ask'), 'split key rides the new embed src');
+ok(paneHost.querySelector('webview').getAttribute('src') === 'http://h.example:8891?key=pasted99#/ask', 'new embed uses only the pasted key and opens without a question');
+ok(fetchCalls.slice(beforeSwitch).every(c => c.u === 'http://h.example:8891/api/assistant/status?key=pasted99') && fetchCalls.length > beforeSwitch, 'new probe starts immediately with the new key');
+ok(paneHost.querySelector('.lb-askbar input').value === '' && !paneHost.querySelector('.lb-copy input'), 'switch clears the previous Ask draft and copy link');
+await act(async () => {
+  rejectOpen(new Error('old browser request failed'));
+  finishProbe({ status: 403 });
+});
+ok(!paneHost.querySelector('.lb-copy input') && chipHost.textContent.includes('◉ lastbook'), 'late callbacks cannot restore a previous link or status');
+
+// A path-only edit keeps this origin's key and question. A pasted key rotates it.
+await setInput(paneHost.querySelector('.lb-askbar input'), 'same server question');
+await click(buttonByText(paneHost, 'url'));
+await setInput(setupInputs()[0], 'http://h.example:8891/guide');
+await click(buttonByText(paneHost, 'Save'));
+ok(ctx.storageMap.get('lastbookKey') === 'pasted99' && paneHost.querySelector('.lb-askbar input').value === 'same server question', 'same-origin edit keeps its saved key and question');
+await click(buttonByText(paneHost, 'url'));
+await setInput(setupInputs()[0], 'http://h.example:8891/?key=rotated-test-key');
+await click(buttonByText(paneHost, 'Save'));
+ok(ctx.storageMap.get('lastbookKey') === 'rotated-test-key', 'a pasted access link rotates the key on the same origin');
+
+// A bare new origin never inherits an existing key, including an edited key draft.
+await click(buttonByText(paneHost, 'url'));
+await setInput(setupInputs()[1], 'unsaved-old-key');
+await setInput(setupInputs()[0], 'https://spare.example');
+ok(setupInputs()[1].value === '', 'changing origins clears the old password field');
+await click(buttonByText(paneHost, 'Save'));
+ok(ctx.storageMap.get('lastbookKey') === '' && paneHost.querySelector('webview').getAttribute('src') === 'https://spare.example#/ask', 'bare URL stores an empty key and opens without the previous question');
+ok(fetchCalls.at(-1).u === 'https://spare.example/api/assistant/status', 'bare new origin receives a keyless status request');
+await click(buttonByText(paneHost, 'url'));
+await setInput(setupInputs()[0], 'http://h.example:8891');
+await setInput(setupInputs()[1], 'explicit-test-key');
+await click(buttonByText(paneHost, 'Save'));
+ok(ctx.storageMap.get('lastbookKey') === 'explicit-test-key', 'can explicitly enter a key for a new origin');
+await click(buttonByText(paneHost, 'url'));
+await setInput(setupInputs()[1], '');
+await click(buttonByText(paneHost, 'Save'));
+ok(ctx.storageMap.get('lastbookKey') === '', 'can explicitly clear a saved key on the same origin');
+await click(buttonByText(paneHost, 'url'));
+await setInput(setupInputs()[0], 'http://h.example:8891/?key=unused-test-key');
+await setInput(setupInputs()[1], '');
+await click(buttonByText(paneHost, 'Save'));
+ok(ctx.storageMap.get('lastbookKey') === '' && !paneHost.querySelector('webview').getAttribute('src').includes('?key=') &&
+  !fetchCalls.at(-1).u.includes('?key='), 'clearing a key suggested by a pasted URL omits it from storage, the embed and the probe');
 
 // ⟳ reload recreates the embed
 const wv3 = paneHost.querySelector('webview');
@@ -353,7 +406,7 @@ ok(!paneHost.querySelector('webview') && !document.querySelector('webview'), 'em
 
 // ── Z · egress audit — every URL the plugin ever touched ───────────────────
 {
-  const allowed = ['http://127.0.0.1:8890/', 'http://192.0.2.20:8891/', 'http://h.example:8891/'];
+  const allowed = ['http://127.0.0.1:8890/', 'http://192.0.2.20:8891/', 'http://h.example:8891/', 'https://spare.example/'];
   const rogue = fetchCalls.filter(c => !allowed.some(a => c.u.startsWith(a)));
   ok(fetchCalls.length > 0 && rogue.length === 0, 'ZERO-network contract: all ' + fetchCalls.length + ' egress calls on configured bases only');
   ok(fetchCalls.every(c => /\/api\/assistant\/status/.test(c.u)), 'every egress call is the status probe (nothing else ever hits the wire)');

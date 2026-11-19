@@ -6,7 +6,7 @@
 // key live in this plugin's own config store (ctx.storage), and every URL
 // that reaches the network passes through originOf()/isConfiguredOrigin() —
 // the single choke point. The one network call site is the best-effort
-// /api/assistant/status status probe below (probe()); nothing functional
+// /api/assistant/status status probe below (probeTick()); nothing functional
 // depends on it — the embedded guide itself is the ground truth.
 //
 // All real interaction (reading, Ask, search, map) happens inside a
@@ -53,7 +53,8 @@ const patch = p => { st = { ...st, ...p }; for (const f of subs) f() }
 let store = null          // ctx.storage (per-plugin config store; never the app's own browser stores)
 let ctxRef = null         // plugin ctx, captured in register() for scoped timers
 let timer = null          // the one 60s probe timer (ctx-scoped — dies with the plugin)
-let inFlight = false
+let configVersion = 0     // invalidate work started under an earlier server configuration
+let probeVersion = null   // at most one pending probe per configuration
 let askSeq = 0
 let activeWebview = null  // live embed element while the pane is mounted
 let askInputEl = null     // live Ask-bar input while the pane is mounted
@@ -116,12 +117,16 @@ const isConfiguredOrigin = cand => !!st.url && originOf(cand) === st.url
 
 // External open: the sanctioned preload bridge, copy-strip fallback (§3.5).
 function openExt (u) {
+  const version = configVersion
+  const showCopyLink = () => {
+    if (version === configVersion) patch({ copyUrl: u })
+  }
   const hd = globalThis.window && globalThis.window.hermesDesktop
   if (hd && typeof hd.openExternal === 'function') {
-    try { Promise.resolve(hd.openExternal(u)).catch(() => patch({ copyUrl: u })) }
-    catch { patch({ copyUrl: u }) }
+    try { Promise.resolve(hd.openExternal(u)).catch(showCopyLink) }
+    catch { showCopyLink() }
   } else {
-    patch({ copyUrl: u })
+    showCopyLink()
   }
 }
 
@@ -130,28 +135,28 @@ function openExt (u) {
 // unreachable server are indistinguishable from here, so a network throw is
 // reported honestly as `unknown` and one webview reload per window asks the
 // embed for ground truth (did-fail-load → offline; did-navigate → ok).
-async function probe () {
-  if (!st.url) { patch({ probe: 'off', modelOnline: null, probeDetail: '' }); return }
+async function probeTick () {
+  const version = configVersion
+  if (!st.url || probeVersion === version) return
+  probeVersion = version
   try {
     const r = await fetch(st.url + '/api/assistant/status' + keyQuery(),
       { redirect: 'manual', credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) })
+    if (version !== configVersion) return
     if (r.status === 403) { patch({ probe: 'needs-key', modelOnline: null, probeDetail: 'server wants the access key' }); return }
     let modelOnline = null
     if (r.status === 200) { try { modelOnline = !!(await r.clone().json()).online } catch { /* non-JSON 200 */ } }
-    patch({ probe: 'ok', modelOnline, probeDetail: 'HTTP ' + r.status })
+    if (version === configVersion) patch({ probe: 'ok', modelOnline, probeDetail: 'HTTP ' + r.status })
   } catch {
+    if (version !== configVersion) return
     patch({ probe: 'unknown', modelOnline: null, probeDetail: 'blocked or offline' })
     if (activeWebview && typeof activeWebview.reload === 'function' && Date.now() - lastUnknownReload > PROBE_EVERY_MS) {
       lastUnknownReload = Date.now()
       try { activeWebview.reload() } catch { /* ground truth never load-bearing */ }
     }
+  } finally {
+    if (probeVersion === version) probeVersion = null
   }
-}
-
-function probeTick () {
-  if (inFlight || !st.url) return
-  inFlight = true
-  Promise.resolve(probe()).finally(() => { inFlight = false })
 }
 
 function ensureTimer () {
@@ -185,8 +190,10 @@ function LastbookPane () {
   const s = useSyncExternalStore(subscribe, getState)
   const [editing, setEditing] = useState(false)
   const [urlDraft, setUrlDraft] = useState('')
-  const [keyDraft, setKeyDraft] = useState('')
+  const [keyDraft, setKeyDraft] = useState(null)
   const [err, setErr] = useState('')
+  const draft = splitKeyPaste(urlDraft)
+  const suggestedKey = draft.key || (draft.origin === s.url ? s.key : '')
 
   // Pane-mount geometry: plugin panes mount inside an
   // auto-height scroll wrapper, so %-heights collapse — pin the wrapper and
@@ -219,22 +226,25 @@ function LastbookPane () {
   useEffect(() => {
     const mount = mountRef.current
     if (!st.url || !mount) return
+    const version = configVersion
     const w = document.createElement('webview')
     w.setAttribute('partition', WEBVIEW_PARTITION)
     w.setAttribute('src', guideSrc(st.question))
     w.setAttribute('style', 'width:100%;flex:1 1 auto;min-height:340px;border:0;background:transparent')
     const onFail = ev => {
+      if (version !== configVersion) return
       if (ev && ev.errorCode === -3) return // aborted navigations are ours
       patch({ probe: 'offline', probeDetail: ((ev && ev.errorCode) != null ? ev.errorCode : '?') + ' ' + ((ev && ev.description) || '') })
     }
     const onNav = ev => {
+      if (version !== configVersion) return
       const o = originOf(ev && ev.url)
       patch({ navOrigin: o })
       if (o && o === st.url) patch({ probe: 'ok', probeDetail: 'guide loaded' })
     }
     const onWin = ev => {
       if (ev && typeof ev.preventDefault === 'function') ev.preventDefault()
-      if (ev && isConfiguredOrigin(ev.url)) openExt(ev.url)
+      if (version === configVersion && ev && isConfiguredOrigin(ev.url)) openExt(ev.url)
     }
     w.addEventListener('did-fail-load', onFail)
     w.addEventListener('did-navigate', onNav)
@@ -259,20 +269,40 @@ function LastbookPane () {
     return () => clearTimeout(t)
   }, [s.focusSeq])
 
-  const openEdit = () => {
-    setUrlDraft(getState().url || '')
-    setKeyDraft(getState().key || '')
+  const closeEdit = () => {
+    setUrlDraft('')
+    setKeyDraft(null)
     setErr('')
-    setEditing(e => !e)
+    setEditing(false)
   }
 
-  const save = (rawUrl, rawKey) => {
-    const r = splitKeyPaste(rawUrl)
-    if (r.error) { setErr(r.error); return }
-    const key = String(rawKey || '').trim() || r.key || ''
-    if (store) { store.set('lastbookUrl', r.origin); store.set('lastbookKey', key) }
-    patch({ url: r.origin, key, navOrigin: '', probe: 'off', modelOnline: null, probeDetail: '', nonce: st.nonce + 1 })
-    setEditing(false)
+  const openEdit = () => {
+    if (editing) { closeEdit(); return }
+    setUrlDraft(st.url)
+    setEditing(true)
+  }
+
+  const editUrl = value => {
+    const next = splitKeyPaste(value)
+    if ((draft.origin && draft.origin !== next.origin) || (next.key && draft.key !== next.key)) setKeyDraft(null)
+    setUrlDraft(value)
+    setErr('')
+  }
+
+  const save = () => {
+    if (draft.error) { setErr(draft.error); return }
+    const changedServer = draft.origin !== st.url
+    const key = keyDraft === null ? suggestedKey : keyDraft.trim()
+    if (store) {
+      // Clear the old key first so an interrupted save cannot pair it with a new server.
+      if (changedServer) store.set('lastbookKey', '')
+      store.set('lastbookUrl', draft.origin)
+      store.set('lastbookKey', key)
+    }
+    configVersion++
+    patch({ url: draft.origin, key, question: changedServer ? '' : st.question, copyUrl: '',
+      navOrigin: '', probe: 'off', modelOnline: null, probeDetail: '', nonce: st.nonce + 1 })
+    closeEdit()
     probeTick()
     ensureTimer()
   }
@@ -334,17 +364,17 @@ function LastbookPane () {
       jsx('input', {
         type: 'text', className: 'lb-input', value: urlDraft,
         placeholder: 'http://127.0.0.1:8890 or your tailnet URL',
-        onChange: e => { setUrlDraft(e.target.value); setErr('') }
+        onChange: e => editUrl(e.target.value)
       }),
       jsx('input', {
-        type: 'password', className: 'lb-input', value: keyDraft,
+        type: 'password', className: 'lb-input', value: keyDraft ?? suggestedKey,
         placeholder: 'access key (only if your server needs one)',
         onChange: e => setKeyDraft(e.target.value)
       }),
       err && jsx('div', { className: 'lb-err', children: err }),
       jsxs('div', { style: { display: 'flex', gap: '6px' }, children: [
-        jsx('button', { type: 'button', className: 'lb-btn', onClick: () => save(urlDraft, keyDraft), children: 'Save' }),
-        !!s.url && jsx('button', { type: 'button', className: 'lb-btn', onClick: () => setEditing(false), children: 'Cancel' })
+        jsx('button', { type: 'button', className: 'lb-btn', onClick: save, children: 'Save' }),
+        !!s.url && jsx('button', { type: 'button', className: 'lb-btn', onClick: closeEdit, children: 'Cancel' })
       ] })
     ] }),
 
@@ -422,6 +452,7 @@ export default {
     patch({
       url: store.get('lastbookUrl', '') || '',
       key: store.get('lastbookKey', '') || '',
+      question: '', copyUrl: '', navOrigin: '',
       hintSeen: Number(store.get('hintSeen', 0)) ? 1 : 0
     })
 
@@ -458,6 +489,7 @@ export default {
     if (st.url) { probeTick(); ensureTimer() }
 
     ctx.onDispose(() => {
+      configVersion++
       clearTimer()
       if (activeWebview) {
         try { activeWebview.remove() } catch { /* already detached */ }

@@ -35,7 +35,7 @@
   (uses the repo's own plugin.js, hash-checked against the pinned release)
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File .\install-lastbook-plugin.ps1 -PluginUrl https://example.invalid/plugin.js -ExpectedSha256 e56534089ac4ae825bf3acecd94a956b2e0d2abb20e520e3ce28cd39192e645b
+  powershell -ExecutionPolicy Bypass -File .\install-lastbook-plugin.ps1 -PluginUrl https://example.invalid/plugin.js -ExpectedSha256 fe047a96414bb614dfb599b9c83985944a58f31fa68c0f2d7104ff99074e154d
 #>
 [CmdletBinding()]
 param(
@@ -49,8 +49,8 @@ $ErrorActionPreference = 'Stop'
 $PluginId     = 'lastbook-guide'
 $PluginName   = 'Lastbook - Survival Guide'
 $OfficialSite = 'https://lastbook.org'
-# Pinned release build (tier 1 plugin.js, 23,267 bytes, 2026-11-18). The README repeats this hash.
-$PinnedSha256 = 'e56534089ac4ae825bf3acecd94a956b2e0d2abb20e520e3ce28cd39192e645b'
+# Pinned release build (tier 1 plugin.js, 24,434 bytes, 2026-11-18). The README repeats this hash.
+$PinnedSha256 = 'fe047a96414bb614dfb599b9c83985944a58f31fa68c0f2d7104ff99074e154d'
 
 function Step([string]$m)  { Write-Host ''; Write-Host "== $m" -ForegroundColor Cyan }
 function Note([string]$m)  { Write-Host "   $m" }

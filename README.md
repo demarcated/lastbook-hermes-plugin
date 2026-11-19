@@ -109,6 +109,8 @@ This is a known Hermes gap (an upstream report is on file), not a Lastbook or pl
   and is sent **only to your server** as the `?key=` parameter your server already asks
   for. Treat it like a Wi-Fi guest password: low-entropy, shareable, not reusable
   elsewhere.
+- Switching servers clears the previous server's access key, current question, and copy link.
+  Paste the new server's access link or enter its key when you switch.
 - Questions you type go only to your server, are never stored by the plugin, and never
   leave toward any other host.
 
@@ -116,7 +118,7 @@ This is a known Hermes gap (an upstream report is on file), not a Lastbook or pl
 
 | Artifact | SHA-256 | Size |
 |---|---|---|
-| `plugin.js` (tier 1 release build) | `e56534089ac4ae825bf3acecd94a956b2e0d2abb20e520e3ce28cd39192e645b` | 23,267 bytes |
+| `plugin.js` (tier 1 release build) | `fe047a96414bb614dfb599b9c83985944a58f31fa68c0f2d7104ff99074e154d` | 24,434 bytes |
 
 The helpers pin the same hash and refuse to install a different file without an explicit
 confirmation. `src/plugin.src.js` holds the identical bytes as the editable source.
