@@ -173,7 +173,7 @@ const paneC = ctx.contributions.find(c => c.area === 'panes');
 const chipC = ctx.contributions.find(c => c.area === SDK.STATUSBAR_AREAS.right);
 const palOpen = ctx.contributions.find(c => c.area === 'palette' && c.data?.id === 'open');
 const palAsk = ctx.contributions.find(c => c.area === 'palette' && c.data?.id === 'ask');
-ok(paneC && paneC.data?.placement === 'bottom' && paneC.data?.dock?.pane === 'workspace' && /px$/.test(paneC.data?.height || ''), 'pane contribution (bottom-docked workspace, px height)');
+ok(paneC && paneC.id === 'guide' && paneC.data?.placement === 'main' && paneC.data?.dock?.pane === 'workspace' && paneC.data?.dock?.pos === 'right' && paneC.data?.dock?.enforce === true && paneC.data?.width === '28rem' && paneC.data?.minWidth === '22rem', 'pane contribution (right-docked workspace track, enforce, 28rem/min 22rem)');
 ok(paneC?.title === 'lastbook', 'pane title "lastbook"');
 ok(chipC && chipC.render && chipC.order === 135, 'status-bar chip contribution (order 135)');
 ok(palOpen?.data?.label === 'Lastbook: open survival guide' && typeof palOpen?.data?.run === 'function', 'palette row "Lastbook: open survival guide"');
@@ -393,7 +393,7 @@ ok(wv4 && wv4 !== wv3, '⟳ reload re-creates the embed element');
 await click(chipHost.querySelector('button'));
 await act(async () => { palOpen.data.run(); });
 await act(async () => { palAsk.data.run(); });
-ok(calls.revealPane.length === 3 && calls.revealPane.every(p => p === 'lastbook-guide:pane'), 'chip + palette rows revealPane("lastbook-guide:pane")');
+ok(calls.revealPane.length === 3 && calls.revealPane.every(p => p === 'lastbook-guide:guide'), 'chip + palette rows revealPane("lastbook-guide:guide")');
 await waitFor('ask input focused by palette', () => dom.window.document.activeElement === paneHost.querySelector('.lb-askbar input'));
 ok(true, 'palette "ask the library" focuses the Ask bar');
 

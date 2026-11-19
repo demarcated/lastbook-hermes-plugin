@@ -38,7 +38,7 @@ own, reproduced and reported upstream; this plugin neither causes it nor fixes i
 upstream ships a re-enable affordance, treat "close the tab" as "uninstall until reload".
 
 **To keep the pane around:** leave the lastbook tab open in Hermes. Docked where it
-ships (bottom of the workspace), it costs one row; you can shrink it, but closing its
+ships (right rail of the workspace), it costs one column; you can shrink it, but closing its
 tab is the one action that disables the plugin.
 
 ## The guide area is blank, grey, or shows a Lastbook deny page

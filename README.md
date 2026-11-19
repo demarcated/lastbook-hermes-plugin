@@ -88,7 +88,7 @@ This is a known Hermes gap (an upstream report is on file), not a Lastbook or pl
 
 ## What you get once it's running
 
-- A **guide panel** docked at the bottom of the Hermes window, showing the real Lastbook
+- A **guide panel** docked along the right side of the Hermes window, showing the real Lastbook
   guide (search, library, map, Ask) — the real UI, with its citations and status line.
 - An **Ask bar**: type a question, press Ask, the embedded guide sends it for you
   (`#/ask?q=` deep-link). `↗` opens the same question in your system browser.
@@ -118,7 +118,7 @@ This is a known Hermes gap (an upstream report is on file), not a Lastbook or pl
 
 | Artifact | SHA-256 | Size |
 |---|---|---|
-| `plugin.js` (tier 1 release build) | `fe047a96414bb614dfb599b9c83985944a58f31fa68c0f2d7104ff99074e154d` | 24,434 bytes |
+| `plugin.js` (tier 1 release build) | `37e87ead6dafda3e31a06b1569f1505547ac3db35d39e32141adb801df26406c` | 24,432 bytes |
 
 The helpers pin the same hash and refuse to install a different file without an explicit
 confirmation. `src/plugin.src.js` holds the identical bytes as the editable source.

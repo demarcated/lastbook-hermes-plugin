@@ -34,7 +34,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
 const ID = 'lastbook-guide'
-const PANE_ID = ID + ':pane'
+const PANE_ID = ID + ':guide'   // v1.0.1: id bumped from ':pane' — fresh layout state so the right-dock hint applies
 const WEBVIEW_PARTITION = 'persist:hermes-lastbook'
 const PROBE_EVERY_MS = 60000
 const PROBE_TIMEOUT_MS = 4000
@@ -462,10 +462,9 @@ export default {
     document.head.appendChild(style)
     ctx.onDispose(() => style.remove())
 
-    const paneHeight = Math.max(460, Math.min(780, Math.round(((globalThis.window?.innerHeight) || 900) * 0.66)))
     ctx.register({
-      id: 'pane', area: 'panes', title: 'lastbook',
-      data: { placement: 'bottom', dock: { pane: 'workspace', pos: 'bottom' }, height: paneHeight + 'px' },
+      id: 'guide', area: 'panes', title: 'lastbook',
+      data: { placement: 'main', dock: { pane: 'workspace', pos: 'right', enforce: true }, width: '28rem', minWidth: '22rem' },
       render: () => jsx(LastbookPane, {})
     })
     ctx.register({ id: 'chip', area: STATUSBAR_AREAS.right, order: 135, render: () => jsx(LastbookChip, {}) })

@@ -35,7 +35,7 @@
   (uses the repo's own plugin.js, hash-checked against the pinned release)
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File .\install-lastbook-plugin.ps1 -PluginUrl https://example.invalid/plugin.js -ExpectedSha256 fe047a96414bb614dfb599b9c83985944a58f31fa68c0f2d7104ff99074e154d
+  powershell -ExecutionPolicy Bypass -File .\install-lastbook-plugin.ps1 -PluginUrl https://example.invalid/plugin.js -ExpectedSha256 37e87ead6dafda3e31a06b1569f1505547ac3db35d39e32141adb801df26406c
 #>
 [CmdletBinding()]
 param(
@@ -49,8 +49,8 @@ $ErrorActionPreference = 'Stop'
 $PluginId     = 'lastbook-guide'
 $PluginName   = 'Lastbook - Survival Guide'
 $OfficialSite = 'https://lastbook.org'
-# Pinned release build (tier 1 plugin.js, 24,434 bytes, 2026-11-18). The README repeats this hash.
-$PinnedSha256 = 'fe047a96414bb614dfb599b9c83985944a58f31fa68c0f2d7104ff99074e154d'
+# Pinned release build (tier 1 plugin.js, 24,432 bytes, 2026-11-19). The README repeats this hash.
+$PinnedSha256 = '37e87ead6dafda3e31a06b1569f1505547ac3db35d39e32141adb801df26406c'
 
 function Step([string]$m)  { Write-Host ''; Write-Host "== $m" -ForegroundColor Cyan }
 function Note([string]$m)  { Write-Host "   $m" }
@@ -218,8 +218,8 @@ Write-Host @'
   1. In the Hermes desktop app press Ctrl+K and choose "Reload desktop plugins".
      (A new plugin.js on disk stays dormant until a reload or an app restart.)
   2. Check Settings > Plugins: "Lastbook - Survival Guide" should be listed and enabled.
-  3. Press Ctrl+K and choose "Lastbook: open survival guide". The panel opens at the
-     bottom of the window. Paste your Lastbook URL (for example http://127.0.0.1:8890
+  3. Press Ctrl+K and choose "Lastbook: open survival guide". The panel opens along the
+     right side of the window. Paste your Lastbook URL (for example http://127.0.0.1:8890
      or the tailnet address you were given). If someone shares the guide with an access
      link, paste the WHOLE link including ?key= -- the panel splits it for you.
      Press Save. The guide should appear inside the panel.

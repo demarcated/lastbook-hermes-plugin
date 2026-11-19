@@ -43,7 +43,7 @@ and prints the next steps.
 
 4. Read what it prints. It tells you where it put the file and what it verified:
    the file it installs must hash to
-   `fe047a96414bb614dfb599b9c83985944a58f31fa68c0f2d7104ff99074e154d`.
+   `37e87ead6dafda3e31a06b1569f1505547ac3db35d39e32141adb801df26406c`.
    If it warns that a file does **not** match that hash, stop and ask whoever gave
    you the file — don't push through the warning.
 5. Skip to [Finish inside Hermes](#finish-inside-hermes).
@@ -107,7 +107,7 @@ Takes two minutes. These steps are the same for both tiers.
    **"Lastbook · Survival Guide"** listed and enabled. A small **`lastbook` chip**
    appears in the status bar at the bottom right.
 3. **Open the panel.** Press **Ctrl+K** and choose **"Lastbook: open survival guide"**.
-   A panel opens at the bottom of the window.
+   A panel opens along the right side of the window.
 4. **Give it your URL.** The first run shows a setup card with two boxes:
    - Paste your URL (e.g. `http://127.0.0.1:8890`, or the tailnet/LAN address you were
      given) into the URL box.
