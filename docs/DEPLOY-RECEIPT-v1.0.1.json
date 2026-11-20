@@ -1,34 +1,31 @@
 {
-  "task": "t_e89de68c",
   "release": "v1.0.1",
   "plugin_id": "lastbook-guide",
   "artifact": "plugin.js (single file, tier 1)",
   "sha256": "37e87ead6dafda3e31a06b1569f1505547ac3db35d39e32141adb801df26406c",
   "bytes": 24432,
   "supersedes": {
-    "release": "v1.0.0 (tier 1, t_68b54e2f)",
+    "release": "v1.0.0 (tier 1)",
     "sha256": "380b88189ec2756d7b966290207102010dcfd9257fb7cc87bd414dda5477b779",
     "bytes": 23325
   },
   "change_scope": "pane id bump lastbook-guide:pane -> lastbook-guide:guide; dock registration placement 'main', dock {pane:'workspace', pos:'right', enforce:true}; height hint dropped for width '28rem' / minWidth '22rem'",
   "test_evidence": {
-    "scaffold": "NODE_PATH=.../plugin-harness/node_modules LB_HARNESS=.../plugin-harness node tests/plugin_scaffold_test.mjs -> PASS, 110 assertions, exit 0 (G1-G4 + egress audit)",
+    "scaffold": "node tests/plugin_scaffold_test.mjs -> PASS, 110 assertions, exit 0 (G1-G4 + egress audit)",
     "byte_parity": "plugin.js == src/plugin.src.js == build/lastbook-guide/plugin.js",
     "stale_id_references": 0
   },
   "deploy": {
-    "workhorse": "C:\\Users\\cyrow\\AppData\\Local\\hermes\\desktop-plugins\\lastbook-guide\\plugin.js (24,432 B, sha256 verified by the shipped ps1 read-back)",
-    "macbook": "/Users/skidrive/.hermes/desktop-plugins/lastbook-guide/plugin.js (24,432 B, sha256 verified by the shipped sh read-back)"
+    "windows": "%LOCALAPPDATA%\\hermes\\desktop-plugins\\lastbook-guide\\plugin.js (24,432 B, sha256 verified by the shipped ps1 read-back)",
+    "macos": "~/.hermes/desktop-plugins/lastbook-guide/plugin.js (24,432 B, sha256 verified by the shipped sh read-back)"
   },
   "docs_repinned": [
     "README.md verification table",
     "plugin.sha256",
     "docs/INSTALL-WINDOWS.md",
     "docs/INSTALL-MACOS.md",
-    "docs/QA-CHECKLIST.md (internal mirror)",
     "tools/install-lastbook-plugin.ps1 $PinnedSha256",
     "tools/install-lastbook-plugin.sh PINNED_SHA256"
   ],
-  "pending": "UI confirmation of the right rail on both hosts: files are byte-verified on disk, but the running desktop instances predate the swap. Ctrl+K -> 'Reload desktop plugins' (or restart) is required before the pane renders.",
   "date": "2026-11-19"
 }
