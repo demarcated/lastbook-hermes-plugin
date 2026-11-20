@@ -84,14 +84,50 @@ ok(!/import\s*\(/.test(src), 'no dynamic import()');
     '\\beval\\b', 'document\\.createElement\\(\\s*[\'"]script'];
   const hits = BANNED.filter(p => new RegExp(p, 'i').test(src));
   ok(hits.length === 0, 'banned-API static scan clean' + (hits.length ? ' — HITS: ' + hits.join(', ') : ''));
-  const stripped = src.replace(/http:\/\/127\.0\.0\.1:8890/g, ''); // the two whitelisted placeholder strings
+  // Whitelisted literals: the v1.0.1 placeholder, the two UX-spec §9.1
+  // allowlist constants (byte-exact-checked in G5), and the §7.1 prose
+  // placeholder http://<host>:<port> (non-routable text, never fetched).
+  let stripped = src.replace(/http:\/\/127\.0\.0\.1:8890/g, '').replace(/http:\/\/<host>:<port>/g, '')
+  stripped = stripped.replace(/https:\/\/lastbook\.org\/download\//g, '')
+  stripped = stripped.replace(/https:\/\/github\.com\/demarcated\/lastbook-hermes-plugin\/blob\/main\/docs\/SETUP\.md/g, '')
   const urls = stripped.match(/https?:\/\/[^\s'"`)]+/g) || [];
-  ok(urls.length === 0, 'no http(s) URL literals outside whitelisted placeholders' + (urls.length ? ' — FOUND: ' + urls.slice(0, 3).join(' | ') : ''));
+  ok(urls.length === 0, 'no http(s) URL literals outside whitelisted placeholders/allowlist constants' + (urls.length ? ' — FOUND: ' + urls.slice(0, 3).join(' | ') : ''));
   ok(/hermesDesktop/.test(src) && /openExternal/.test(src), 'external opens use the sanctioned preload bridge');
   ok(/persist:hermes-lastbook/.test(src), 'embed uses the dedicated partition');
   ok(/data-lb/.test(src), 'injected <style> is tagged for teardown');
   ok(!/\/api\/(setup|update|chat)\b/.test(src), 'never calls /api/setup/*, /api/update/* or /api/chat');
   ok(/api\/assistant\/status/.test(src), 'the single call site is the status probe');
+}
+
+// ── G5 · setup-assistant static compliance (UX spec §9.1/§12) ─────────────
+{
+  ok(src.includes("const LASTBOOK_DOWNLOAD_URL = 'https://lastbook.org/download/'"), 'G5 download constant byte-exact (versionless, §9.1)');
+  ok(src.includes("const SETUP_DOCS_URL = 'https://github.com/demarcated/lastbook-hermes-plugin/blob/main/docs/SETUP.md'"), 'G5 docs constant byte-exact (pinned SETUP_DOCS_URL)');
+  const allowConstants = [
+    "const LASTBOOK_DOWNLOAD_URL = 'https://lastbook.org/download/'",
+    "const SETUP_DOCS_URL = 'https://github.com/demarcated/lastbook-hermes-plugin/blob/main/docs/SETUP.md'"
+  ];
+  ok(allowConstants.every(c => !c.includes('key=')), 'G5 allowlist constants carry no key material');
+  ok((src.match(/openExternal\s*\(/g) || []).length === 1, 'G5 exactly ONE openExternal( call site (inside openExt)');
+  ok((src.match(/\bfetch\s*\(/g) || []).length === 1, 'G5 assistant added zero fetch sites (probe stays unique)');
+  ok(!/Lastbook[-_][\d.]+|_Setup\.exe|-mac\.dmg|_amd64\.deb|downloads\.lastbook\.org/i.test(src), 'G5 no versioned installer URLs or binary filenames in code');
+  ok(!/[0-9a-f]{64}/.test(src), 'G5 no digests embedded in plugin code (§9.4: dated build metadata is optional and shipped null)');
+  // every real (non-placeholder) URL literal is one of the two constants
+  const lit = src.replace(/http:\/\/127\.0\.0\.1:8890/g, '').replace(/http:\/\/<host>:<port>/g, '').match(/https?:\/\/[^\s'"`)]+/g) || [];
+  ok(lit.length > 0 && lit.every(u => u === 'https://lastbook.org/download/' || u === 'https://github.com/demarcated/lastbook-hermes-plugin/blob/main/docs/SETUP.md'), 'G5 the only real URL literals are the two allowlist constants');
+  // the download/docs buttons must be click-gated: every openExt call site is
+  // either an onClick arrow or the configured-origin webview popup route.
+  const openExtCalls = (src.match(/openExt\(/g) || []).length;
+  const onClickOpens = (src.match(/onClick: \(\) => openExt\(/g) || []).length;
+  ok(onClickOpens >= 4 && openExtCalls === onClickOpens + 1 && src.includes('isConfiguredOrigin(ev.url)) openExt(ev.url)'),
+    'G5 openExt fires only from click handlers + the configured-origin popup route (no automatic opens)');
+  ok(src.includes('BUILD_META = null'), 'G5 integrity line ships unpopulated (no undated/stale assertions possible)');
+  ok(/disabled: mode === 'S5' \|\| !s\.url/.test(src) && src.includes("'checking…'"), 'G5 S5 checking… disabled label swap present (§4.4)');
+  // display:none would stop did-navigate/did-fail-load (§3.4 ground-truth rule).
+  // Scan the CSS rule strings only — prose comments legitimately mention the word.
+  const cssText = (src.match(/'\.lb-[^']*'/g) || []).join(' ');
+  ok(cssText.includes('.lb-mount-hidden') && /height: 0/.test(cssText) && !/display:\s*none/.test(cssText),
+    'G5 S4 embed hidden via height-0 wrapper, never display:none (§3.4)');
 }
 
 // ── G3 · runtime harness (jsdom + real react/react-dom, scripted fetch) ────
@@ -143,7 +179,7 @@ const pre = imports.map(i => {
 const body = src.replace(importRe, '')
   .replace(/^export default\b/m, 'globalThis.__PLUGIN__ =');
 new Function('__I', pre + '\n' + body +
-  '\n;globalThis.__LB__ = { isLoopback, normalizeUrl, splitKeyPaste, keyQuery, guideSrc, buildAskUrl, isConfiguredOrigin, patch, getState };')(injected);
+  '\n;globalThis.__LB__ = { isLoopback, normalizeUrl, splitKeyPaste, keyQuery, guideSrc, buildAskUrl, isConfiguredOrigin, paneModeOf, osGuess, downloadLabel, patch, getState };')(injected);
 const plugin = globalThis.__PLUGIN__;
 const LB = globalThis.__LB__;
 
@@ -204,17 +240,27 @@ const setInput = async (el, v) => {
 const click = async el => { await act(async () => { el.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })); }); };
 const buttonByText = (root, text) => [...root.querySelectorAll('button')].find(b => b.textContent.trim() === text);
 
-// ── no-url first run: setup card, no embed, hint strip ─────────────────────
+// ── no-url first run: S0 setup assistant, no embed, hint strip ─────────────
 const paneHost = document.createElement('div'); document.body.appendChild(paneHost);
 const paneRoot = createRoot(paneHost);
 act(() => paneRoot.render(paneC.render()));
 ok(!paneHost.querySelector('webview'), 'no embed before a URL is configured');
-const setupText = paneHost.querySelector('.lb-setup')?.textContent || '';
-ok(setupText.includes('Already run Lastbook? paste its URL.'), 'setup line 1 (already run Lastbook)');
-ok(setupText.includes('lastbook.org'), 'setup line 2 (official installer, no re-release)');
-ok(setupText.includes('?key=') && setupText.includes('only on this machine'), 'setup line 3 (access link/key privacy)');
+const assist0 = paneHost.querySelector('.lb-assist');
+ok(!!assist0 && assist0.textContent.includes('get set up with lastbook'), 'S0 first-run assistant header (§4.2)');
+const s0titles = [...paneHost.querySelectorAll('.lb-step-title')].map(el => el.textContent.trim());
+ok(s0titles.length === 4 && s0titles[0].startsWith('1. install lastbook') && s0titles[1].startsWith('2. open lastbook') &&
+  s0titles[2].startsWith('3. paste the url') && s0titles[3].startsWith('4. check again'), 'S0 four numbered steps, verbatim titles (§4.2)');
+ok(assist0.textContent.includes('Opens lastbook.org in your browser') && assist0.textContent.includes('SmartScreen/Gatekeeper prompts') &&
+  assist0.textContent.includes('this plugin only opens the official link'), 'S0 caption states browser-driven download + user-driven OS prompts (§4.2/§9.2)');
+ok(assist0.textContent.includes('the key stays on this machine'), 'S0 step 3 keeps the key-privacy line (§4.2)');
+ok(!!assist0.querySelector('.lb-setup') && assist0.querySelectorAll('.lb-setup input').length === 2, 'S0 embeds the reused edit row inside step 3 (§5)');
+ok(!!paneHost.querySelector('.lb-setup input[placeholder="http://127.0.0.1:8890 or your tailnet URL"]') &&
+  !!paneHost.querySelector('.lb-setup input[placeholder="access key (only if your server needs one)"]'), 'S0 reuses the v1.0.1 inputs verbatim (placeholders unchanged)');
+ok(!![...paneHost.querySelectorAll('button')].find(b => b.textContent.trim().startsWith('⤓ download Lastbook')), 'S0 OS-aware download button present (§4.6)');
+ok(!!buttonByText(paneHost, 'full setup guide ↗') && !buttonByText(paneHost, 'not now') && !buttonByText(paneHost, 'advanced'), 'S0 links row: docs link only (no dismiss/advanced before config)');
+ok(!paneHost.querySelector('.lb-askbar'), 'no Ask bar while the assistant is up (§5)');
 const hintEl = paneHost.querySelector('.lb-hint');
-ok(hintEl && hintEl.textContent.includes('Closing this tab disables the plugin') && hintEl.textContent.includes('Reload desktop plugins'), 'close-pane quirk hint strip present');
+ok(hintEl && hintEl.textContent.includes('Closing this tab disables the plugin') && hintEl.textContent.includes('Reload desktop plugins'), 'close-pane quirk hint strip present (independent of assistant)');
 
 // hint dismissal persists
 const chipHost = document.createElement('div'); document.body.appendChild(chipHost);
@@ -307,19 +353,24 @@ ok(true, 'unknown triggers ONE webview ground-truth reload per window (offline d
 const failEv = new dom.window.Event('did-fail-load'); failEv.errorCode = -102; failEv.description = 'CONNECTION_REFUSED';
 act(() => wv2.dispatchEvent(failEv));
 ok(chipHost.textContent.includes('○ lastbook'), 'embed did-fail-load → chip ○ offline (ground truth over probe)');
+const wvHidden = paneHost.querySelector('.lb-mount.lb-mount-hidden webview');
+ok(!!wvHidden && wvHidden === wv2, 'assistant keeps the webview mounted at height-0, never display:none (§3.4)');
 const navEv = new dom.window.Event('did-navigate'); navEv.url = 'http://192.0.2.20:8891/?key=example%20key#/ask';
 act(() => wv2.dispatchEvent(navEv));
 ok(chipHost.textContent.includes('◉ lastbook') && paneHost.querySelector('.lb-origin')?.textContent === 'http://192.0.2.20:8891', 'embed did-navigate → ◉ + meta row shows origin ONLY (honesty affordance)');
+const wv2b = paneHost.querySelector('webview');
+ok(!!wv2b && wv2b !== wv2 && !paneHost.querySelector('.lb-mount-hidden'), 'T-RS did-navigate heal bumps nonce → embed re-mounted fresh (§10.2)');
+ok(!paneHost.querySelector('.lb-assist') && !!paneHost.querySelector('.lb-askbar'), 'webview ground-truth heal dismisses the assistant and restores the Ask bar');
 
 // webview popups: configured-origin → bridge; off-origin → dropped silently
 const popEv = new dom.window.Event('new-window', { cancelable: true }); popEv.url = 'http://192.0.2.20:8891/#/read/x/2';
 dom.window.hermesDesktop = { openExternal: async () => {} };
-act(() => wv2.dispatchEvent(popEv));
+act(() => wv2b.dispatchEvent(popEv));
 ok(popEv.defaultPrevented, 'embed popup preventDefault (window-open policy is deny — we never pop windows)');
 const badEv = new dom.window.Event('new-window', { cancelable: true }); badEv.url = 'http://evil.example/steal';
 let offOriginOpened = false;
 dom.window.hermesDesktop = { openExternal: async u => { offOriginOpened = !!u; } };
-act(() => wv2.dispatchEvent(badEv));
+act(() => wv2b.dispatchEvent(badEv));
 ok(!offOriginOpened, 'off-origin embed popup dropped silently (isConfiguredOrigin choke point)');
 
 // Switch servers while a copy fallback is visible and earlier requests are still pending.
@@ -397,6 +448,150 @@ ok(calls.revealPane.length === 3 && calls.revealPane.every(p => p === 'lastbook-
 await waitFor('ask input focused by palette', () => dom.window.document.activeElement === paneHost.querySelector('.lb-askbar input'));
 ok(true, 'palette "ask the library" focuses the Ask bar');
 
+// ══ G6/G7/G8 · setup assistant (UX spec §12 gates) ════════════════════════
+let opens = [];
+{
+  // ── G6 · probe failure → assistant; dismiss/re-entry; retry-probe T6/T-RS ─
+  mode = { kind: 'throw' };
+  await click(buttonByText(paneHost, 'url'));
+  await setInput(setupInputs()[0], 'http://h.example:8891');
+  await click(buttonByText(paneHost, 'Save'));
+  await waitFor('S4 assistant', () => !!paneHost.querySelector('.lb-assist'));
+  const a4 = paneHost.querySelector('.lb-assist');
+  ok(a4.textContent.includes("your shared server isn't answering"), "G6 non-loopback S4 title (§4.3)");
+  ok(a4.textContent.includes('Nothing replied at') && a4.textContent.includes('http://h.example:8891') &&
+    a4.textContent.includes('this pane only talks to that server'), 'G6 S4 sub-line names the configured URL honestly (§0 principle 1)');
+  const t4 = [...paneHost.querySelectorAll('.lb-step-title')].map(el => el.textContent.trim());
+  ok(t4.length === 4 && t4[0].startsWith('1. wake the server') && t4[1].startsWith('2. confirm the link') &&
+    t4[2].startsWith('3. paste the access link') && t4[3].startsWith('4. check again'), 'G6 S4 four steps (§4.3)');
+  ok(a4.textContent.includes('python server.py --port 8890 --lan'), 'G6 wake-the-server step mentions the guide command (§4.3)');
+  ok(!!a4.querySelector('.lb-setup input'), 'G6 S4 embeds the reused edit row (§5)');
+  ok(a4.textContent.includes('or run your own server on this computer →'), 'G6 secondary own-server link (§4.3)');
+  const mount4 = paneHost.querySelector('.lb-mount');
+  ok(mount4 && mount4.classList.contains('lb-mount-hidden') && !!mount4.querySelector('webview'), 'G6 S4 embed mounted at height-0 (§3.4)');
+  ok(!paneHost.querySelector('.lb-askbar') && !buttonByText(paneHost, '↗ browser'), 'G6 S4 hides Ask bar + browser button (§5)');
+  ok(!!buttonByText(paneHost, 'advanced') && !!buttonByText(paneHost, 'full setup guide ↗') && !!buttonByText(paneHost, 'not now'), 'G6 S4 links row complete (§4.1)');
+
+  await click(buttonByText(paneHost, 'not now'));
+  ok(!paneHost.querySelector('.lb-assist') && !!paneHost.querySelector('.lb-mount') &&
+    !paneHost.querySelector('.lb-mount').classList.contains('lb-mount-hidden') && !!paneHost.querySelector('.lb-askbar'),
+    'G6 not now → S1 legacy plain pane, embed visible again (T8)');
+  const setupBtn = buttonByText(paneHost, 'setup');
+  ok(!!setupBtn, 'G6 S1 carries the setup re-entry button (§5)');
+  await click(setupBtn);
+  ok(!!paneHost.querySelector('.lb-assist'), 'G6 setup → S4 returns (T9)');
+
+  // advanced overlay (S8) is inline text, no network
+  await click(buttonByText(paneHost, 'advanced'));
+  const advEl = paneHost.querySelector('.lb-adv');
+  ok(!!advEl && advEl.textContent.includes('Running the guide headless') && advEl.textContent.includes('derived/lan-key') &&
+    advEl.textContent.includes('the download page shows current checksums.') && advEl.textContent.includes('independent client'),
+    'G6 advanced panel: headless path + dated-integrity fallback + attribution, all inline (§7)');
+  await click(buttonByText(paneHost, 'hide details'));
+  ok(!paneHost.querySelector('.lb-adv'), 'G6 advanced collapses back');
+
+  const g6wvPre = paneHost.querySelector('webview');
+  let finishRetry;
+  mode = { kind: 'pending', response: new Promise(res => { finishRetry = res; }) };
+  const beforeRetry = fetchCalls.length;
+  await click(buttonByText(paneHost, '⟳ retry check'));
+  ok(!!buttonByText(paneHost, 'checking…') && buttonByText(paneHost, 'checking…').disabled, 'G6 retry → S5 checking… disabled, same slot (§4.4)');
+  ok(!!paneHost.querySelector('.lb-assist'), 'G6 S5 keeps the steps');
+  ok(paneHost.querySelector('.lb-diag') && paneHost.querySelector('.lb-diag').textContent.includes('still nothing — last check'), 'G6 S5 keeps previous diagnostics until the new result lands (§4.4)');
+  ok(fetchCalls.length === beforeRetry + 1 && fetchCalls.at(-1).u === 'http://h.example:8891/api/assistant/status', 'G6 retry-probe reuses the single fetch site against the CONFIGURED url/key (§6.1)');
+  await act(async () => { finishRetry({ status: 200, clone: () => ({ json: async () => ({ online: true }) }) }); });
+  await waitFor('S2 connected', () => chipHost.textContent.includes('◉ lastbook'));
+  ok(!paneHost.querySelector('.lb-assist') && !!paneHost.querySelector('.lb-askbar'), 'G6 T-RS → S2, assistant gone, Ask restored');
+  const g6wvPost = paneHost.querySelector('webview');
+  ok(g6wvPost && g6wvPost !== g6wvPre && !paneHost.querySelector('.lb-mount-hidden'), 'G6 T-RS bumped nonce → embed re-mounted (remount pitfall §10.2)');
+
+  // ── G6b · loopback branch copy + failure diagnostics (T-RF) ───────────────
+  mode = { kind: 'throw' };
+  await click(buttonByText(paneHost, 'url'));
+  await setInput(setupInputs()[0], 'http://127.0.0.1:8890');
+  await click(buttonByText(paneHost, 'Save'));
+  await waitFor('S4 loopback', () => !!paneHost.querySelector('.lb-assist'));
+  const a4b = paneHost.querySelector('.lb-assist');
+  ok(a4b.textContent.includes("lastbook isn't answering"), 'G6b loopback S4 title (§4.2)');
+  ok(a4b.textContent.includes("Usually Lastbook just isn't open on this computer") &&
+    a4b.textContent.includes('a blocked port can look the same from here'), 'G6b loopback sub-line stays honest about CORS-vs-dead (§0 principle 1)');
+  ok(a4b.textContent.includes('Open Lastbook and let it load'), 'G6b loopback step 2');
+  const b4u = fetchCalls.at(-1).u;
+  ok(b4u === 'http://127.0.0.1:8890/api/assistant/status', 'G6b loopback probe key-exempt even after assistant (loopback rule kept)');
+  let finishFail;
+  mode = { kind: 'pending', response: new Promise((_, rej) => { finishFail = rej; }) };
+  await click(buttonByText(paneHost, '⟳ retry check'));
+  ok(!!buttonByText(paneHost, 'checking…'), 'G6b retry → S5');
+  await act(async () => { try { await Promise.reject(new TypeError('Failed to fetch')); } catch { /* expected */ } finishFail(new TypeError('Failed to fetch')); });
+  await waitFor('back to S4', () => { const b = buttonByText(paneHost, '⟳ retry check'); return !!b && !b.disabled; });
+  const diag = paneHost.querySelector('.lb-diag');
+  ok(!!diag && /still nothing — last check \d{2}:\d{2}:\d{2}, blocked or offline/.test(diag.textContent),
+    'G6b T-RF → S4 with timestamped diagnostics carrying the honest raw cause (§6.3)');
+
+  // ── G8 · OS-aware labels + external opens (same constant) ────────────────
+  dom.window.hermesDesktop = { openExternal: async u => { opens.push(String(u)); } };
+  const setUA = ua => Object.defineProperty(dom.window.navigator, 'userAgent', { value: ua, configurable: true });
+  const dlBtnOf = () => [...paneHost.querySelectorAll('button')].find(b => b.textContent.trim().startsWith('⤓ download Lastbook'));
+  const uaCases = [
+    ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', '⤓ download Lastbook for Windows'],
+    ['Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', '⤓ download Lastbook for macOS'],
+    ['Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', '⤓ download Lastbook'],
+    ['HermesDesktop/1.0', '⤓ download Lastbook']
+  ];
+  for (const [ua, label] of uaCases) {
+    setUA(ua);
+    // Any assistant re-render re-evaluates the label; toggling advanced is
+    // the user-visible way to force one without touching private state.
+    await click(buttonByText(paneHost, 'advanced') || buttonByText(paneHost, 'hide details'));
+    const b = dlBtnOf();
+    ok(!!b && b.textContent.trim() === label, 'G8 UA → ' + label + ' (§4.6)');
+    if (ua.includes('Macintosh')) ok(paneHost.querySelector('.lb-assist').textContent.includes('Apple Silicon (M1+) on macOS 14 or newer'), 'G8 macOS caption addendum (§4.6)');
+    await click(b);
+  }
+  await waitFor('four external opens', () => opens.length === 4);
+  ok(opens.every(u => u === 'https://lastbook.org/download/'), 'G8 every OS branch opens the single versionless constant (§9.1)');
+  await click(buttonByText(paneHost, 'full setup guide ↗'));
+  await waitFor('docs open', () => opens.length === 5);
+  ok(opens[4] === 'https://github.com/demarcated/lastbook-hermes-plugin/blob/main/docs/SETUP.md', 'G8 docs button opens the pinned SETUP_DOCS_URL byte-exact');
+  delete dom.window.hermesDesktop;
+  await click(dlBtnOf());
+  const copyDl = paneHost.querySelector('.lb-copy input');
+  ok(copyDl && copyDl.value === 'https://lastbook.org/download/' && !copyDl.value.includes('key='),
+    'G8 bridge-missing copy strip shows the allowlist link, no key material (§9.5/T11)');
+  await click(buttonByText(paneHost, '✕'));
+  setUA('Mozilla/5.0 (linux) AppleWebKit/537.36 (KHTML, like Gecko) jsdom/31.0.1');
+}
+
+// ── G7 · needs-key: compact S3 banner, NOT the assistant ────────────────────
+{
+  mode = { kind: 'json', status: 403, body: { denied: true } };
+  ctx.intervals.find(t => t.ms === 60000).fn();   // background tick (no retry button in S2)
+  await waitFor('S3 banner', () => !!paneHost.querySelector('.lb-keybanner'));
+  ok(chipHost.textContent.includes('⚿ lastbook'), 'G7 403 → ⚿ needs-key chip');
+  ok(!paneHost.querySelector('.lb-assist'), 'G7 needs-key does NOT trigger the assistant (locked decision 2)');
+  const mount3 = paneHost.querySelector('.lb-mount');
+  ok(!!mount3.querySelector('webview') && !mount3.classList.contains('lb-mount-hidden'), 'G7 embed stays fully visible — the 403 deny page is authoritative (§3.2)');
+  const banner = paneHost.querySelector('.lb-keybanner');
+  ok(banner.textContent.includes('the server is up but wants an access key') && banner.textContent.includes('it stays on this machine'), 'G7 banner copy verbatim (§4.5)');
+  ok(!!buttonByText(paneHost, 'paste key'), 'G7 empty-key variant offers paste key');
+  await click(buttonByText(paneHost, 'paste key'));
+  await waitFor('key input focused', () => dom.window.document.activeElement === paneHost.querySelectorAll('.lb-setup input')[1]);
+  ok(true, 'G7 paste key opens the reused edit row focused on the key input (§4.5)');
+  await setInput(paneHost.querySelectorAll('.lb-setup input')[1], 'g7-test-key');
+  mode = { kind: 'json', status: 200, body: { online: true } };
+  await click(buttonByText(paneHost, 'Save'));
+  ok(ctx.storageMap.get('lastbookKey') === 'g7-test-key' && !paneHost.querySelector('.lb-keybanner'), 'G7 key Save routes through the existing key-clearing save path (§5)');
+  // key already present → stale-key wording + update key
+  mode = { kind: 'json', status: 403, body: { denied: true } };
+  ctx.intervals.find(t => t.ms === 60000).fn();
+  await waitFor('update key', () => !!buttonByText(paneHost, 'update key'));
+  ok(paneHost.querySelector('.lb-keybanner').textContent.includes('may be stale or belong to a different server'), 'G7 saved-key variant states the key may be stale (§4.5)');
+  mode = { kind: 'json', status: 200, body: { online: true } };
+  ctx.intervals.find(t => t.ms === 60000).fn();
+  await waitFor('chip ok again', () => chipHost.textContent.includes('◉ lastbook'));
+  ok(true, 'G7 needs-key → ok heals the banner away (background tick, L7 parity)');
+}
+
 // ── teardown ────────────────────────────────────────────────────────────────
 act(() => { paneRoot.unmount(); chipRoot.unmount(); });
 for (const d of ctx.disposers.splice(0)) d();
@@ -410,6 +605,10 @@ ok(!paneHost.querySelector('webview') && !document.querySelector('webview'), 'em
   const rogue = fetchCalls.filter(c => !allowed.some(a => c.u.startsWith(a)));
   ok(fetchCalls.length > 0 && rogue.length === 0, 'ZERO-network contract: all ' + fetchCalls.length + ' egress calls on configured bases only');
   ok(fetchCalls.every(c => /\/api\/assistant\/status/.test(c.u)), 'every egress call is the status probe (nothing else ever hits the wire)');
+  ok(fetchCalls.every(c => !/lastbook\.org|github\.com/i.test(c.u)), 'Z assistant NEVER fetches the allowlist hosts — openExternal-only (L9 static mirror)');
+  ok(opens.length === 5 && opens.slice(0, 4).every(u => u === 'https://lastbook.org/download/') &&
+    opens[4] === 'https://github.com/demarcated/lastbook-hermes-plugin/blob/main/docs/SETUP.md',
+    'Z every assistant-driven external open is one of the two allowlist constants, nothing else opened');
 }
 
 // ── G4 · deep-link + key unit table (pure functions from module scope) ─────
@@ -457,5 +656,5 @@ ok(!paneHost.querySelector('webview') && !document.querySelector('webview'), 'em
 }
 
 globalThis.setInterval = realSetInterval;
-console.log(failures ? `\nFAIL — ${failures} gate(s) red` : '\nPASS — all tier-1 scaffold gates green (G1–G4 + egress audit)');
+console.log(failures ? `\nFAIL — ${failures} gate(s) red` : '\nPASS — all gates green (G1 validator · G2 privacy · G3 runtime · G4 deep-link/key table · G5 setup-assistant · G6 state machine · G7 needs-key · G8 OS labels · Z egress)');
 process.exit(failures ? 1 : 0);

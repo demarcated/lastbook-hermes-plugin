@@ -98,6 +98,11 @@ This is a known Hermes gap (an upstream report is on file), not a Lastbook or pl
   (`#/ask?q=` deep-link). `↗` opens the same question in your system browser.
 - A **status chip** (bottom right): `◉ lastbook` reachable · `⚿` needs the access key ·
   `○` offline · `◌` unknown · `–` no URL yet. Click it to open the panel.
+- A **setup assistant**: when nothing answers at the configured URL you get guided steps
+  (install Lastbook, or wake the shared server), the URL/key fields inline, a **retry
+  check** button, and honest timestamped diagnostics — not a generic error. Downloads open
+  the official **lastbook.org/download** page in your system browser when you click; the
+  plugin never downloads, mirrors or runs any installer itself.
 - Two **Ctrl+K commands**: "Lastbook: open survival guide" and "Lastbook: ask the library".
 
 ## Privacy, in one page
@@ -108,7 +113,10 @@ This is a known Hermes gap (an upstream report is on file), not a Lastbook or pl
   inside the embedded guide, which is your server's own page.
 - No telemetry, no analytics, no crash reporting, no third-party requests, no mic,
   camera or notifications. No `window.open`; external links go through Hermes' own
-  "open in browser" bridge, and only when you click them.
+  "open in browser" bridge, and only when you click them. The setup assistant's links
+  come from a **closed two-URL allowlist** compiled into the plugin (the official
+  versionless lastbook.org download page and this repo's setup guide) — nothing else
+  can ever open externally, and the assistant adds no network calls of its own.
 - Your access key is stored **only on this machine** in the plugin's own config store,
   and is sent **only to your server** as the `?key=` parameter your server already asks
   for. Treat it like a Wi-Fi guest password: low-entropy, shareable, not reusable
@@ -122,7 +130,7 @@ This is a known Hermes gap (an upstream report is on file), not a Lastbook or pl
 
 | Artifact | SHA-256 | Size |
 |---|---|---|
-| `plugin.js` (tier 1 release build) | `37e87ead6dafda3e31a06b1569f1505547ac3db35d39e32141adb801df26406c` | 24,432 bytes |
+| `plugin.js` (v1.1.0 release build — setup assistant) | `cb3609f68feae3f346670e826f040fcc0368db990626aa452319d4d839055c27` | 41,562 bytes |
 
 The helpers pin the same hash and refuse to install a different file without an explicit
 confirmation. `src/plugin.src.js` holds the identical bytes as the editable source.
@@ -138,7 +146,6 @@ docs/INSTALL-WINDOWS.md        tier 1 + tier 2, step by step (Windows)
 docs/INSTALL-MACOS.md          tier 1 + tier 2, step by step (macOS)
 docs/SETUP.md                  guided first run · shared server · headless server (advanced)
 docs/TROUBLESHOOTING.md        symptoms → fixes, incl. the close-pane quirk
-docs/QA-CHECKLIST.md           acceptance checks for both desktop hosts
 tools/install-lastbook-plugin.ps1   Windows setup helper
 tools/install-lastbook-plugin.sh    macOS setup helper
 tests/plugin_scaffold_test.mjs      build gates (G1–G4), node, no deps

@@ -35,7 +35,7 @@
   (uses the repo's own plugin.js, hash-checked against the pinned release)
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File .\install-lastbook-plugin.ps1 -PluginUrl https://example.invalid/plugin.js -ExpectedSha256 37e87ead6dafda3e31a06b1569f1505547ac3db35d39e32141adb801df26406c
+  powershell -ExecutionPolicy Bypass -File .\install-lastbook-plugin.ps1 -PluginUrl https://example.invalid/plugin.js -ExpectedSha256 cb3609f68feae3f346670e826f040fcc0368db990626aa452319d4d839055c27
 #>
 [CmdletBinding()]
 param(
@@ -49,8 +49,8 @@ $ErrorActionPreference = 'Stop'
 $PluginId     = 'lastbook-guide'
 $PluginName   = 'Lastbook - Survival Guide'
 $OfficialSite = 'https://lastbook.org'
-# Pinned release build (tier 1 plugin.js, 24,432 bytes, 2026-11-19). The README repeats this hash.
-$PinnedSha256 = '37e87ead6dafda3e31a06b1569f1505547ac3db35d39e32141adb801df26406c'
+# Pinned release build (v1.1.0 setup-assistant plugin.js, 41,562 bytes, 2026-11-20). The README repeats this hash.
+$PinnedSha256 = 'cb3609f68feae3f346670e826f040fcc0368db990626aa452319d4d839055c27'
 
 function Step([string]$m)  { Write-Host ''; Write-Host "== $m" -ForegroundColor Cyan }
 function Note([string]$m)  { Write-Host "   $m" }
@@ -160,8 +160,14 @@ if ($found) {
    Lastbook is separate software from lastbook.org. This helper will not download it for you.
    The official way, in order:
 
-     1. Download the signed installer for Windows (64-bit, Windows 10 or later) from
-        https://lastbook.org -- it is Authenticode signed by the Lastbook project.
+     1. Download the Windows installer (64-bit; Windows 10 or later) from
+        https://lastbook.org. Upstream publishes checksums, not signature metadata: as
+        of 2026-11-20 there is no Authenticode statement in the manifest, the download
+        page, or https://lastbook.org/SHA256SUMS.txt. After downloading, verify the
+        digest against the published registry and compare it with the download page:
+            certutil -hashfile Downloads\Lastbook-<version>-Setup.exe SHA256
+        Treat any signature status as something to check locally (for example the
+        Windows SDK's signtool verify /pv), not something this helper asserts.
      2. Open Lastbook once and let its first-run setup choose and download a library pack
         (Small, Medium or All) plus a state map. The app downloads only from
         downloads.lastbook.org and checks every file's SHA-256 before using it. No other

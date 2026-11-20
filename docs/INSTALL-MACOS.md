@@ -41,7 +41,7 @@ next steps.
    ```
 
 3. Read what it prints. The file it installs must hash to
-   `37e87ead6dafda3e31a06b1569f1505547ac3db35d39e32141adb801df26406c`. If it warns that
+   `cb3609f68feae3f346670e826f040fcc0368db990626aa452319d4d839055c27`. If it warns that
    a file does **not** match that hash, stop and ask whoever gave you the file — don't
    push through the warning.
 4. Skip to [Finish inside Hermes](#finish-inside-hermes).
@@ -76,9 +76,11 @@ lastbook.org should) but it walks you through exactly what to do, in order.
    It checks `/Applications/Lastbook.app`, notices you don't have Lastbook and prints
    the official route.
 2. **Install Lastbook itself:** go to [https://lastbook.org](https://lastbook.org) and
-   download the signed macOS installer (Apple Silicon, macOS 14 or later). The helper
-   will offer to open the site for you. Drag it into your Applications folder the way
-   the site shows.
+   download the official macOS installer (Apple Silicon, macOS 14 or later). The helper
+   will offer to open the site for you. Check its SHA-256 after downloading
+   (`shasum -a 256 <file>`) — the published registry is
+   `https://lastbook.org/SHA256SUMS.txt`, see [docs/SETUP.md](SETUP.md). Drag the app
+   into your Applications folder the way the site shows.
 3. **Open Lastbook once** and let its first-run setup pick a library pack — Small,
    Medium or All — plus a state map. The app downloads packs only from
    `downloads.lastbook.org` and checks every file's SHA-256 before using it. Big packs

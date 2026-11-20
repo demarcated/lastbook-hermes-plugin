@@ -27,8 +27,8 @@ set -euo pipefail
 PLUGIN_ID="lastbook-guide"
 PLUGIN_NAME="Lastbook · Survival Guide"
 OFFICIAL_SITE="https://lastbook.org"
-# Pinned release build (tier 1 plugin.js, 24,432 bytes, 2026-11-19). The README repeats this hash.
-PINNED_SHA256="37e87ead6dafda3e31a06b1569f1505547ac3db35d39e32141adb801df26406c"
+# Pinned release build (v1.1.0 setup-assistant plugin.js, 41,562 bytes, 2026-11-20). The README repeats this hash.
+PINNED_SHA256="cb3609f68feae3f346670e826f040fcc0368db990626aa452319d4d839055c27"
 
 step() { printf '\n\033[36m== %s\033[0m\n' "$1"; }
 note() { printf '   %s\n' "$1"; }
@@ -143,8 +143,13 @@ else
    Lastbook is separate software from lastbook.org. This helper will not download it for you.
    The official way, in order:
 
-     1. Download the signed installer for macOS (Apple Silicon, macOS 14 or later) from
-        https://lastbook.org -- the build is signed and notarized by the Lastbook project.
+     1. Download the macOS installer (Apple Silicon, macOS 14 or later) from
+        https://lastbook.org. As of 2026-11-20 the lastbook.org/download/ page says its
+        Mac build is "signed with our Developer ID and notarized by Apple" -- that is
+        the upstream page's claim, quoted with its date; check the page for what it
+        says today. After downloading, verify the digest against the published registry
+        https://lastbook.org/SHA256SUMS.txt:
+            shasum -a 256 ~/Downloads/Lastbook-<version>-mac.dmg
      2. Open Lastbook once and let its first-run setup choose and download a library pack
         (Small, Medium or All) plus a state map. The app downloads only from
         downloads.lastbook.org and checks every file's SHA-256 before using it. No other
