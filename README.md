@@ -74,6 +74,10 @@ download the library packs** (Small, Medium or All, plus a state map). Its first
 setup is the only thing that should ever fetch packs — from `downloads.lastbook.org`,
 SHA-256-checked. The helper and the plugin never download packs.
 
+A full guided walkthrough — first run on a new computer, connecting to a shared
+server, and running the guide server **headless** (advanced, e.g. on an NVIDIA Spark)
+— is in [docs/SETUP.md](docs/SETUP.md).
+
 ## The one quirk you must know
 
 **Closing the plugin's only pane tab disables the plugin.** The app remembers the closed
@@ -132,6 +136,7 @@ plugin.js                      THE artifact — single file, hash-pinned above
 src/plugin.src.js              same bytes, editable source of truth
 docs/INSTALL-WINDOWS.md        tier 1 + tier 2, step by step (Windows)
 docs/INSTALL-MACOS.md          tier 1 + tier 2, step by step (macOS)
+docs/SETUP.md                  guided first run · shared server · headless server (advanced)
 docs/TROUBLESHOOTING.md        symptoms → fixes, incl. the close-pane quirk
 docs/QA-CHECKLIST.md           acceptance checks for both desktop hosts
 tools/install-lastbook-plugin.ps1   Windows setup helper

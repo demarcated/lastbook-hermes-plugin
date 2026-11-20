@@ -72,8 +72,10 @@ lastbook.org should) but it walks you through exactly what to do, in order.
 1. Run the helper exactly as in [Tier 1 Option A](#option-a--run-the-setup-helper-recommended).
    It detects you don't have Lastbook and prints the official route.
 2. **Install Lastbook itself:** go to [https://lastbook.org](https://lastbook.org) and
-   download the signed Windows installer (64-bit; Windows 10 or later). The helper will
-   offer to open the site for you.
+   download the official Windows installer (64-bit; Windows 10 or later). The helper
+   will offer to open the site for you. Check its SHA-256 after downloading
+   (`certutil -hashfile <file> SHA256`) — the published registry is
+   `https://lastbook.org/SHA256SUMS.txt`, see [docs/SETUP.md](SETUP.md).
 3. **Open Lastbook once** and let its first-run setup pick a library pack — Small,
    Medium or All — plus a state map. The app downloads packs only from
    `downloads.lastbook.org` and checks every file's SHA-256 before using it. Big packs
